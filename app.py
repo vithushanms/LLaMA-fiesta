@@ -1,38 +1,39 @@
-import torch
-from transformers import GPT2LMHeadModel, GPT2Tokenizer
-from flask import Flask, request
+import subprocess
+import sys
+from urllib.parse import urlencode
+import requests
+from dotenv import dotenv_values
 
-app = Flask(__name__)
+def main():
+    config = dotenv_values(".env")
 
-@app.route("/generate_text", methods=["POST"])
-def generate_text():
-    prompt = request.json["prompt"]
-    
-    tokenizer = GPT2Tokenizer.from_pretrained("gpt2")
-    model = GPT2LMHeadModel.from_pretrained("./models/ggml-vicuna-13b-4bit.bin")
-    
-    input_ids = tokenizer.encode(prompt, return_tensors="pt")
-    generated_ids = model.generate(input_ids, max_length=100, num_return_sequences=1)
-    generated_text = tokenizer.decode(generated_ids[0], skip_special_tokens=True)
-    
-    return {"response": generated_text}
+    LLAMA_MAIN = config.get("LLAMA_MAIN")
+    LLAMA_MODEL_PATH = config.get("LLAMA_MODEL_PATH")
+    LLAMA_NUM_THREADS = config.get("LLAMA_NUM_THREADS")
+    MAX_OUTPUT_LENGTH = int(config.get("MAX_OUTPUT_LENGTH", 256))
 
-if __name__ == "__main__":
-    app.run()
+    def handle_request(request):
+        model_input = request.args.get("text", b"").decode()
+        cmd = [
+            LLAMA_MAIN,
+            "-m", LLAMA_MODEL_PATH,
+            "-t", LLAMA_NUM_THREADS,
+            "-n", str(MAX_OUTPUT_LENGTH),
+            "-p", model_input
+        ]
+        process = subprocess.Popen(cmd, stdout=subprocess.PIPE)
+        return process.stdout
 
+    def generate_response(stream):
+        try:
+            for line in stream:
+                try:
+                    sys.stdout.buffer.write(line)
+                    sys.stdout.buffer.flush()
+                except KeyboardInterrupt:
+                    break
+        except:
+            pass
 
-# import torch
-# from transformers import GPT2LMHeadModel
-# from flask import Flask, request
-
-# app = Flask(__name__)
-
-# @app.route("/generate_text", methods=["POST"])
-# def generate_text():
-#     prompt = request.json["prompt"]
-#     model = GPT2LMHeadModel.from_pretrained("models/ggml-vicuna-13b-4bit.bin")
-#     generated_text = model.generate(prompt, max_length=100, num_return_sequences=1)
-#     return {"response": generated_text}
-
-# if __name__ == "__main__":
-#     app.run()
+    query = input("\nPlease type the inputs for the model, then press Enter:\n\n")
+    params = urlencode({"text": query})
