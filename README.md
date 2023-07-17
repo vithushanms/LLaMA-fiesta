@@ -1,5 +1,5 @@
 # LLaMA-fiesta
-A client application that helps to run open source LLaMA LLMs locally
+An extender for LLaMA models to run it at a lower hardware cost
 
 # 01. Python Streaming API
 
